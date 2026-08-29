@@ -427,7 +427,7 @@ async def get_active_subtitle_details(user, content_id, video_hash=None, content
     
     # 4. Best match by filename
     if video_filename:
-        best_match = await _find_best_match_by_filename(user, content_id, imdb_id, video_filename, content_type, lang, season, episode, cached_provider_results)
+        best_match = await _find_best_match_by_filename(user, content_id, imdb_id, video_filename, content_type, lang, season, episode, cached_provider_results, video_hash=video_hash)
         if best_match:
             result.update(best_match)
             result['auto'] = True
@@ -436,7 +436,7 @@ async def get_active_subtitle_details(user, content_id, video_hash=None, content
             return result
     
     # 5. Fallback
-    fallback = await _find_fallback_subtitle(user, content_id, imdb_id, content_type, lang, season, episode, cached_provider_results)
+    fallback = await _find_fallback_subtitle(user, content_id, imdb_id, content_type, lang, season, episode, cached_provider_results, video_hash=video_hash)
     if fallback:
         result.update(fallback)
         result['auto'] = True
@@ -515,6 +515,8 @@ async def _search_providers_by_hash(user, imdb_id, video_hash, content_type, lan
         for provider_name, results in cached_results.items():
             for result in results:
                 if result.language == lang and result.metadata and result.metadata.get('hash_match'):
+                    if result.ai_translated and user.ignore_ai_subtitles:
+                        continue
                     hash_matches.append((provider_name, result))
         
         # Prioritize forced if user setting enabled
@@ -575,6 +577,8 @@ async def _search_providers_by_hash(user, imdb_id, video_hash, content_type, lan
         for provider_name, results in results_by_provider.items():
             for result in results:
                 if result.metadata and result.metadata.get('hash_match'):
+                    if result.ai_translated and user.ignore_ai_subtitles:
+                        continue
                     hash_matches.append((provider_name, result))
         
         # Prioritize forced if user setting enabled
@@ -612,7 +616,7 @@ async def _search_providers_by_hash(user, imdb_id, video_hash, content_type, lan
     return None
 
 
-async def _find_best_match_by_filename(user, content_id, imdb_id, video_filename, content_type, lang, season=None, episode=None, cached_results=None):
+async def _find_best_match_by_filename(user, content_id, imdb_id, video_filename, content_type, lang, season=None, episode=None, cached_results=None, video_hash=None):
     """Find best match by filename from cache or live search"""
     candidates = []
     
@@ -634,6 +638,8 @@ async def _find_best_match_by_filename(user, content_id, imdb_id, video_filename
         for provider_name, results in cached_results.items():
             for result in results:
                 if result.language == lang:
+                    if result.ai_translated and user.ignore_ai_subtitles:
+                        continue
                     is_result_forced = result.forced or (result.release_name and 'forced' in result.release_name.lower())
                     score = calculate_filename_similarity(video_filename, result.release_name, is_forced=is_result_forced)
                     if result.ai_translated:
@@ -663,6 +669,7 @@ async def _find_best_match_by_filename(user, content_id, imdb_id, video_filename
             
             search_params = {
                 'imdb_id': imdb_id,
+                'video_hash': video_hash,
                 'languages': [lang],
                 'season': season,
                 'episode': episode,
@@ -674,6 +681,8 @@ async def _find_best_match_by_filename(user, content_id, imdb_id, video_filename
             
             for provider_name, results in results_by_provider.items():
                 for result in results:
+                    if result.ai_translated and user.ignore_ai_subtitles:
+                        continue
                     is_result_forced = result.forced or (result.release_name and 'forced' in result.release_name.lower())
                     score = calculate_filename_similarity(video_filename, result.release_name, is_forced=is_result_forced)
                     if result.ai_translated:
@@ -733,7 +742,7 @@ async def _find_best_match_by_filename(user, content_id, imdb_id, video_filename
         }
 
 
-async def _find_fallback_subtitle(user, content_id, imdb_id, content_type, lang, season=None, episode=None, cached_results=None):
+async def _find_fallback_subtitle(user, content_id, imdb_id, content_type, lang, season=None, episode=None, cached_results=None, video_hash=None):
     """Find fallback subtitle from cache or live search"""
     # Local first
     async with async_session_maker() as session:
@@ -763,6 +772,7 @@ async def _find_fallback_subtitle(user, content_id, imdb_id, content_type, lang,
             
             search_params = {
                 'imdb_id': imdb_id,
+                'video_hash': video_hash,
                 'languages': [lang],
                 'season': season,
                 'episode': episode,
@@ -778,6 +788,12 @@ async def _find_fallback_subtitle(user, content_id, imdb_id, content_type, lang,
     for provider_name, lang_results in results_by_provider.items():
         if not lang_results:
             continue
+        
+        # Filter out AI subtitles if user has ignore_ai_subtitles enabled
+        if user.ignore_ai_subtitles:
+            lang_results = [r for r in lang_results if not r.ai_translated]
+            if not lang_results:
+                continue
         
         if episode:
             matching = []

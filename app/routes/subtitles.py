@@ -423,6 +423,9 @@ async def unified_download(manifest_token: str, download_identifier: str):
     # Use the utility function to get active subtitle details (now with OpenSubtitles fallback)
     active_subtitle_info = await get_active_subtitle_details(user, content_id, video_hash, content_type, video_filename, lang, season, episode)
 
+    # TEMP DEBUG: log what get_active_subtitle_details returned for troubleshooting
+    current_app.logger.warning(f"[DOWNLOAD DEBUG] user={user.id}, content={content_id}, hash={video_hash}, lang={lang}, result_type={active_subtitle_info['type']}, provider={active_subtitle_info.get('provider_name')}")
+
     local_subtitle_to_serve = None
     provider_subtitle_to_serve = None
     message_key = None
@@ -654,9 +657,12 @@ async def unified_download(manifest_token: str, download_identifier: str):
                     else:
                         # Plain text subtitle (VTT/SRT)
                         if is_ass_request:
-                            # ASS requested but provider returned plain text - serve as VTT
                             current_app.logger.info(f"ASS requested but provider returned plain text, serving as VTT")
-                        vtt_content = await r.text()
+                        raw_bytes = await r.read()
+                        # Detect encoding instead of assuming UTF-8
+                        from ..lib.subtitles import detect_encoding
+                        encoding = detect_encoding(raw_bytes)
+                        vtt_content = raw_bytes.decode(encoding, errors='replace')
         except asyncio.TimeoutError:
             current_app.logger.warning(f"Timeout fetching subtitle from {provider_subtitle_url}")
             message_key = 'provider_timeout'
