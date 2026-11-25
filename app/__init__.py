@@ -2,7 +2,7 @@
 import os
 import logging
 from quart import Quart, request
-from .extensions import init_async_db, auth_manager, init_cors, cache, csrf, babel
+from .extensions import init_async_db, auth_manager, init_cors, cache, csrf, babel, init_cache
 from config import get_config
 
 
@@ -49,6 +49,17 @@ def create_app():
             app.logger.warning(f"Failed to setup Better Stack: {e}")
     
     init_async_db(app)
+    
+    # Auto-migrate schema: add missing columns so selfhosters don't need
+    # manual ALTER TABLE after updates. Runs once at startup, safe to call
+    # repeatedly (checks column existence before adding).
+    try:
+        from .schema_migrate import run_auto_migrations
+        run_auto_migrations(app.config['SQLALCHEMY_DATABASE_URI'])
+    except Exception as e:
+        app.logger.warning(f"Auto-migration check failed (non-fatal): {e}")
+    
+    init_cache(app)
     auth_manager.init_app(app)
     csrf.init_app(app)
     init_cors(app)
@@ -115,6 +126,36 @@ def create_app():
     app.register_blueprint(language_bp)
     app.register_blueprint(internal_bp)
 
+    @app.errorhandler(404)
+    async def not_found(error):
+        from quart import render_template
+        from quart_babel import gettext as _t
+        return await render_template('errors/error.html',
+            error_code=404,
+            error_title=_t('Page Not Found'),
+            error_message=_t('The page you are looking for does not exist or has been removed.')
+        ), 404
+
+    @app.errorhandler(403)
+    async def forbidden(error):
+        from quart import render_template
+        from quart_babel import gettext as _t
+        return await render_template('errors/error.html',
+            error_code=403,
+            error_title=_t('Access Denied'),
+            error_message=_t('You do not have permission to access this page.')
+        ), 403
+
+    @app.errorhandler(500)
+    async def internal_error(error):
+        from quart import render_template
+        from quart_babel import gettext as _t
+        return await render_template('errors/error.html',
+            error_code=500,
+            error_title=_t('Server Error'),
+            error_message=_t('Something went wrong on our end. Please try again later.')
+        ), 500
+
     @app.errorhandler(413)
     async def request_entity_too_large(error):
         max_mb = app.config.get('MAX_CONTENT_LENGTH', 15 * 1024 * 1024) // (1024 * 1024)
@@ -130,6 +171,19 @@ def create_app():
     # Register custom Jinja filters
     from .routes.utils import sanitize_filename
     app.jinja_env.filters['sanitize_filename'] = lambda s: sanitize_filename(s) or ''
+    
+    import base64
+    app.jinja_env.filters['b64encode'] = lambda s: base64.urlsafe_b64encode(str(s).encode()).decode().rstrip('=') if s else ''
+
+    @app.context_processor
+    def inject_globals():
+        import datetime
+        from .version import VERSION
+        return {
+            'current_year': datetime.datetime.utcnow().year,
+            'app_version': VERSION,
+            'registration_enabled': not app.config.get('DISABLE_REGISTRATION', False),
+        }
 
     @app.context_processor
     def inject_providers():

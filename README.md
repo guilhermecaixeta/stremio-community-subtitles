@@ -16,6 +16,7 @@ Every subtitle you upload helps build a community database that benefits all use
 
 - **📱 Cross-Device Subtitle Support** – Use custom subtitles on web, mobile, TV, or desktop
 - **🌍 Community Database** – Your uploads help other users watching the same files
+- **🌓 Light, Dark & System Themes** – Match the website to your preferred appearance automatically
 - **🤖 Automatic Subtitle Selection** – Subtitles are selected automatically based on your video file
 - **📤 Upload Without Watching** – Upload subtitles without starting playback
 - **🎯 Multiple Subtitle Providers** – Connect to OpenSubtitles, SubDL, and Subsource for enhanced subtitle search
@@ -110,12 +111,12 @@ Read the privacy policy here:
 **Translation Status:**
 - 🇬🇧 English — ✅ Complete (base language)
 - 🇵🇱 Polski (Polish) — ✅ Complete
-- 🇪🇸 Español (Spanish) — ✅ Complete
-- 🇵🇹 Português (Portuguese) — ✅ Complete
-- 🇧🇷 Português (BR) — ✅ Complete
-- 🇸🇦 العربية (Arabic) — ✅ Complete
 - 🇻🇳 Tiếng Việt (Vietnamese) — ✅ Complete
-- 🇹🇷 Türkçe (Turkish) — 🟢 99%
+- 🇪🇸 Español (Spanish) — 🟢 99%
+- 🇸🇦 العربية (Arabic) — 🟢 99%
+- 🇵🇹 Português (Portuguese) — 🟢 99%
+- 🇧🇷 Português (BR) — 🟢 99%
+- 🇹🇷 Türkçe (Turkish) — 🟢 98%
 - 🇫🇷 Français (French) — 🟢 98%
 - 🇮🇹 Italiano (Italian) — 🟢 98%
 - 🇨🇳 中文 (Chinese) — 🟢 97%
